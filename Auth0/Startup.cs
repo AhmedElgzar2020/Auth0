@@ -1,3 +1,4 @@
+using AspNetCoreRateLimit;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -9,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -29,6 +31,22 @@ namespace Auth0
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            // needed to load configuration from appsettings.json
+            //services.AddOptions();
+
+            // needed to store rate limit counters and ip rules
+            //services.AddMemoryCache();
+
+            //load general configuration from appsettings.json
+            //services.Configure<IpRateLimitOptions>(Configuration.GetSection("IpRateLimiting"));
+
+            //load ip rules from appsettings.json
+            //services.Configure<IpRateLimitPolicies>(Configuration.GetSection("IpRateLimitPolicies"));
+            // inject counter and rules stores
+            //services.AddInMemoryRateLimiting();
+            //services.AddSingleton<IIpPolicyStore, DistributedCacheIpPolicyStore>();
+            //services.AddSingleton<IRateLimitCounterStore, DistributedCacheRateLimitCounterStore>();
+
             services.AddControllers();
             string domain = $"https://{Configuration["Auth0:Domain"]}/";
             services
@@ -50,7 +68,33 @@ namespace Auth0
             });
 
             services.AddSingleton<IAuthorizationHandler, HasScopeHandler>();
-            services.AddSwaggerGen();
+            services.AddSwaggerGen(opt =>
+            {
+                opt.SwaggerDoc("v1", new OpenApiInfo { Title = "MyAPI", Version = "v1" });
+                opt.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+                {
+                    In = ParameterLocation.Header,
+                    Description = "Please enter token",
+                    Name = "Authorization",
+                    Type = SecuritySchemeType.Http,
+                    BearerFormat = "JWT",
+                    Scheme = "bearer"
+                });
+                opt.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type=ReferenceType.SecurityScheme,
+                    Id="Bearer"
+                }
+            },
+            new string[]{}
+        }
+    });
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -60,7 +104,7 @@ namespace Auth0
             {
                 app.UseDeveloperExceptionPage();
             }
-
+            //app.UseIpRateLimiting();
             app.UseHttpsRedirection();
 
             app.UseRouting();

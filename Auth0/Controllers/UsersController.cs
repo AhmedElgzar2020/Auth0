@@ -10,6 +10,7 @@ using System.Net.Http.Headers;
 using System.Collections.Generic;
 using Auth0.Models;
 using Microsoft.AspNetCore.Authentication;
+using System.Net;
 
 namespace Auth0.Controllers
 {
@@ -24,13 +25,13 @@ namespace Auth0.Controllers
             Configuration = configuration;
         }
 
-        [HttpGet("login")]
-        public async Task<IActionResult> Login(string userName, string password)
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] Credential credential)
         {
             var data = new List<KeyValuePair<string, string>>();
             data.Add(new KeyValuePair<string, string>("grant_type", "password"));
-            data.Add(new KeyValuePair<string, string>("username", userName));
-            data.Add(new KeyValuePair<string, string>("password", password));
+            data.Add(new KeyValuePair<string, string>("username", credential.userName));
+            data.Add(new KeyValuePair<string, string>("password", credential.password));
             data.Add(new KeyValuePair<string, string>("audience", Configuration["Auth0:Audience"]));
             data.Add(new KeyValuePair<string, string>("client_id", Configuration["Auth0:ClientId"]));
             data.Add(new KeyValuePair<string, string>("client_secret", Configuration["Auth0:ClientSecret"]));
@@ -55,6 +56,8 @@ namespace Auth0.Controllers
             _httpClient.DefaultRequestHeaders.Authorization =new AuthenticationHeaderValue( "Bearer",  token.Result);
             //_httpClient.DefaultRequestHeaders.Add("Authorization", "Bearer " + token.Result);
             var response = await _httpClient.GetAsync(Configuration["Auth0:URL"] + "userinfo");
+            if(response.StatusCode== HttpStatusCode.Unauthorized)
+                return Unauthorized(new {message="Expired Token, Please Login again" });
             var responseString = await response.Content.ReadAsStringAsync();
             var data_ = JsonSerializer.Deserialize<object>(responseString);
             return Ok(data_);
